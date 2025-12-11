@@ -15,13 +15,42 @@ const eventCounts = {};
 
 // POST /event
 app.post('/event', (req, res) => {
-  const { eventType } = req.body;
-  if (!eventType) {
-    return res.status(400).json({ message: 'Missing eventType' });
-  }
-  eventCounts[eventType] = (eventCounts[eventType] || 0) + 1;
-  res.json({ message: 'Event recorded', eventCounts });
-});
+    const {
+      sessionId,
+      pageUrl,
+      currentPage,
+      userAgent,
+      viewport,
+      clicks,
+      mouseMovements,
+      scrolls,
+      timeOnPage,
+      paymentId,
+      timestamp,
+      sessionStatus,
+      conversionTime,
+      rageClicks,
+      isFinal
+    } = req.body;
+  
+    // Basic required fields check
+    if (!sessionId || !pageUrl || !timestamp) {
+      return res.status(400).json({ message: 'Missing required sessionId, pageUrl, or timestamp' });
+    }
+  
+    // You can optionally validate types and structures here
+  
+    // Example: Store full event object in memory (or save to DB, Kafka, S3, etc)
+    if (!global.fullEventStore) {
+      global.fullEventStore = [];
+    }
+    global.fullEventStore.push(req.body);
+  
+    res.json({
+      message: 'Event data received',
+      received: req.body
+    });
+  });  
 
 // GET /counts
 app.get('/counts', (req, res) => {
