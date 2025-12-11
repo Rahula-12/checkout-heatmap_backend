@@ -33,14 +33,33 @@ app.post('/event', (req, res) => {
       isFinal
     } = req.body;
   
-    // Basic required fields check
-    if (!sessionId || !pageUrl || !timestamp) {
-      return res.status(400).json({ message: 'Missing required sessionId, pageUrl, or timestamp' });
+    // Validation omitted for clarity
+  
+    // --- NEW: Update eventCounts ---
+  
+    // Count by pageUrl
+    if (pageUrl) {
+      eventCounts["pages"] = eventCounts["pages"] || {};
+      eventCounts["pages"][pageUrl] = (eventCounts["pages"][pageUrl] || 0) + 1;
     }
+    // Count clicks for the page
+    if (clicks && Array.isArray(clicks) && pageUrl) {
+      eventCounts["clicks"] = eventCounts["clicks"] || {};
+      eventCounts["clicks"][pageUrl] = (eventCounts["clicks"][pageUrl] || 0) + clicks.length;
+    }
+    // Count sessions
+    if (sessionId) {
+      eventCounts["sessions"] = eventCounts["sessions"] || {};
+      if (!eventCounts["sessions"][sessionId]) {
+        eventCounts["sessions"][sessionId] = 1;
+      }
+      // Optionally, you could store session-level details or just count unique sessions
+    }
+    // (Extend: Mouse moves, scrolls, rageClicks, etc.)
+    // Example: Aggregate total events (optional)
+    eventCounts["totalEvents"] = (eventCounts["totalEvents"] || 0) + 1;
   
-    // You can optionally validate types and structures here
-  
-    // Example: Store full event object in memory (or save to DB, Kafka, S3, etc)
+    // --- Store in-memory for demo/demo analytics
     if (!global.fullEventStore) {
       global.fullEventStore = [];
     }
@@ -50,7 +69,8 @@ app.post('/event', (req, res) => {
       message: 'Event data received',
       received: req.body
     });
-  });  
+  });
+  
 
 // GET /counts
 app.get('/counts', (req, res) => {
