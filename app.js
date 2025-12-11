@@ -77,60 +77,70 @@ Format as a short paragraph.
 });
 
 function beautifyAndSegregateInsights(text) {
-    // 1. Normalize text and split into logical sections (by numbering or newlines)
-    const sections = text.split(/\n{2,}|\r\n\r\n|(?=\n?\d+\.\s)/).filter(Boolean);
+    // Split on double newlines, list numbers, or big bullets, but keep line order
+    const sections = text
+      .split(/\n{2,}|(?=\n?\d+\.\s)/)
+      .filter(Boolean)
+      .map(s => s.trim())
+      .filter(Boolean);
+  
     const results = [];
   
-    // 2. Parse each section for insight/suggestion pairs
     for (let sec of sections) {
-      // Remove leading numbering or bullets
-      sec = sec.replace(/^\s*-?\d+\.\s*/, '').trim();
+      // Remove leading list/bullet/number marker, extra markup
+      sec = sec.replace(/^\s*-?\d+\.\s*/, '').replace(/^\s*\*\s*/, '').trim();
   
-      // Try to find Insight and Suggestion pairs
-      let insight = null, suggestion = null;
+      // Try to segment out UX Suggestion, UX Recommendation, Recommendation, etc
+      let suggestion = '';
+      let insight = sec;
   
-      // Most common pattern: "**Insight:** ... **UX Suggestion:** ..."
-      // or "Insight: ..." or "* Insight: ..."
-      let insightMatch = sec.match(/(?:\*+|\s*)Insight:?\*+?\s*(.*?)(?:\n|$)/i);
-      if (insightMatch) {
-        insight = insightMatch[1].trim();
-        // Look for suggestion immediately after
-        let suggMatch = sec.match(/(UX|User.*?)?(Suggestion)[:：]?\*+?\s*(.*)/i);
-        if (suggMatch) suggestion = suggMatch[3].trim();
-      } else {
-        // Try splitting by lines and keywords if markdown not present
-        const lines = sec.split(/\n|\r\n/).map(l => l.trim()).filter(Boolean);
+      // Handles: **UX Suggestion:**, UX Suggestion:, * UX Suggestion:
+      const suggestionRegex = /(.*?)(?:[\n\*]*)?(?:\*\*?\s*)?(UX( |-)?)?Suggestion(s)?(:|：)?\*{0,2}\s*(.*)/i;
+  
+      let match = suggestionRegex.exec(sec);
+      if (match && match[6]) {
+        insight = (match[1] || '').replace(/[\*\-\s]+$/, '').trim();
+        suggestion = match[6].trim();
+      }
+  
+      // Further fallback: If suggestion is still empty, check for lines starting with Suggestion after an "Insight"
+      if (!suggestion) {
+        const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+        let found = false;
         lines.forEach(line => {
-          if (!insight && /insight/i.test(line)) {
-            insight = line.replace(/insight[:：]?\s*/i, '').replace(/^\W+/, '').trim();
-          }
-          if (!suggestion && /suggestion/i.test(line)) {
-            suggestion = line.replace(/(ux|user)?.*suggestion[:：]?\s*/i, '').replace(/^\W+/, '').trim();
+          if (/suggestion[:：]/i.test(line)) {
+            suggestion = line.replace(/.*suggestion[:：]\s*/i, '').trim();
+            found = true;
           }
         });
+        if (found) {
+          insight = lines.filter(line => !/suggestion[:：]/i.test(line)).join(' ');
+        }
       }
   
-      // If not structured, just grab first half as insight, second as suggestion as fallback
-      if (!insight || !suggestion) {
-        const fallback = sec.split(/[\*\:]\s?/).map(l => l.trim()).filter(Boolean);
-        insight = insight || fallback[0] || '';
-        suggestion = suggestion || fallback.slice(1).join(' ') || '';
+      // Fallback: If only one line, treat as insight, empty suggestion
+      if (!insight && suggestion) {
+        insight = '';
+      }
+      if (!suggestion && insight) {
+        // Try to split on ". " and treat first as insight if it looks like two sentences merged
+        const split = insight.split(/\. (?![a-z])/i);
+        if (split.length > 1) {
+          insight = split[0] + '.';
+          suggestion = split.slice(1).join('. ');
+        }
       }
   
-      // Clean up any leading markdown or bullet chars
-      if (insight) insight = insight.replace(/^[\*\-\s]+/, '').trim();
-      if (suggestion) suggestion = suggestion.replace(/^[\*\-\s]+/, '').trim();
-  
-      // Push if at least one field is non-empty
-      if (insight || suggestion) {
-        results.push({
-          insight,
-          suggestion
-        });
-      }
+      // Clean up
+      results.push({
+        insight: insight.trim(),
+        suggestion: suggestion.trim()
+      });
     }
-    return results;
+  
+    return results.filter(pair => pair.insight || pair.suggestion);
   }
+  
   
 
 const PORT = process.env.PORT || 3000;
