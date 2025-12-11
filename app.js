@@ -62,7 +62,7 @@ Format as a short paragraph.
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to generate insights' });
+    res.status(500).json({ error: err });
   }
 });
 
