@@ -4,7 +4,7 @@ import cors from 'cors';
 import { OpenRouter } from "@openrouter/sdk";
 
 const openrouter = new OpenRouter({
-  apiKey: "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", // <-- Keep your key safe!
+  apiKey: process.env.API_KEY  // <-- Keep your key safe!
 });
 
 const app = express();
