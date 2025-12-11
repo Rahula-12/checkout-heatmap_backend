@@ -62,18 +62,76 @@ Format as a short paragraph.
     insightText = insightText.trim().replace(/^[\\s\\n]+|[\\s\\n]+$/g, ''); // remove excess newlines/space
     // Optionally replace double newline with single for compactness
     insightText = insightText.replace(/\\n{2,}/g, '\\n');
+    let response=beautifyAndSegregateInsights(insightText);
 
     if (!insightText) {
       insightText = "No insights generated. There may not be enough event data yet.";
     }
 
-    res.json({ insights: insightText, counts: eventCounts });
+    res.json(response);
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err });
   }
 });
+
+function beautifyAndSegregateInsights(text) {
+    // 1. Normalize text and split into logical sections (by numbering or newlines)
+    const sections = text.split(/\n{2,}|\r\n\r\n|(?=\n?\d+\.\s)/).filter(Boolean);
+    const results = [];
+  
+    // 2. Parse each section for insight/suggestion pairs
+    for (let sec of sections) {
+      // Remove leading numbering or bullets
+      sec = sec.replace(/^\s*-?\d+\.\s*/, '').trim();
+  
+      // Try to find Insight and Suggestion pairs
+      let insight = null, suggestion = null;
+  
+      // Most common pattern: "**Insight:** ... **UX Suggestion:** ..."
+      // or "Insight: ..." or "* Insight: ..."
+      let insightMatch = sec.match(/(?:\*+|\s*)Insight:?\*+?\s*(.*?)(?:\n|$)/i);
+      if (insightMatch) {
+        insight = insightMatch[1].trim();
+        // Look for suggestion immediately after
+        let suggMatch = sec.match(/(UX|User.*?)?(Suggestion)[:：]?\*+?\s*(.*)/i);
+        if (suggMatch) suggestion = suggMatch[3].trim();
+      } else {
+        // Try splitting by lines and keywords if markdown not present
+        const lines = sec.split(/\n|\r\n/).map(l => l.trim()).filter(Boolean);
+        lines.forEach(line => {
+          if (!insight && /insight/i.test(line)) {
+            insight = line.replace(/insight[:：]?\s*/i, '').replace(/^\W+/, '').trim();
+          }
+          if (!suggestion && /suggestion/i.test(line)) {
+            suggestion = line.replace(/(ux|user)?.*suggestion[:：]?\s*/i, '').replace(/^\W+/, '').trim();
+          }
+        });
+      }
+  
+      // If not structured, just grab first half as insight, second as suggestion as fallback
+      if (!insight || !suggestion) {
+        const fallback = sec.split(/[\*\:]\s?/).map(l => l.trim()).filter(Boolean);
+        insight = insight || fallback[0] || '';
+        suggestion = suggestion || fallback.slice(1).join(' ') || '';
+      }
+  
+      // Clean up any leading markdown or bullet chars
+      if (insight) insight = insight.replace(/^[\*\-\s]+/, '').trim();
+      if (suggestion) suggestion = suggestion.replace(/^[\*\-\s]+/, '').trim();
+  
+      // Push if at least one field is non-empty
+      if (insight || suggestion) {
+        results.push({
+          insight,
+          suggestion
+        });
+      }
+    }
+    return results;
+  }
+  
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
