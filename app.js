@@ -58,6 +58,15 @@ Format as a short paragraph.
       }
     }
 
+    // Post-process output
+    insightText = insightText.trim().replace(/^[\\s\\n]+|[\\s\\n]+$/g, ''); // remove excess newlines/space
+    // Optionally replace double newline with single for compactness
+    insightText = insightText.replace(/\\n{2,}/g, '\\n');
+
+    if (!insightText) {
+      insightText = "No insights generated. There may not be enough event data yet.";
+    }
+
     res.json({ insights: insightText, counts: eventCounts });
 
   } catch (err) {
